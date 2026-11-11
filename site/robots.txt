@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://creditt.com.au/sitemap.xml
