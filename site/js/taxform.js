@@ -8,7 +8,7 @@
     var cur = 0;
     function active() {
       var picked = [].slice.call(form.querySelectorAll('input[name="applies[]"]:checked')).map(function (i) { return i.value; });
-      return all.filter(function (s) { var k = s.getAttribute('data-key'); return k === 'about' || k === 'auth' || picked.indexOf(k) > -1; });
+      return all.filter(function (s) { var k = s.getAttribute('data-key'); return k === 'about' || k === 'bank' || k === 'auth' || picked.indexOf(k) > -1; });
     }
     function show(i) {
       var list = active(); cur = Math.max(0, Math.min(i, list.length - 1));
