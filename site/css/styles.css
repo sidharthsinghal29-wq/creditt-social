@@ -337,7 +337,7 @@ input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 
 .value:nth-child(3) { background: #EFE6FB; }
 .value p { margin: 0; }
 .prose { max-width: 40em; }
-.cred { font-size: .98rem; max-width: 52em; }
+.cred-note { font-size: .98rem; max-width: 52em; }
 
 /* ---------- Responsive ---------- */
 @media (max-width: 1020px) {
