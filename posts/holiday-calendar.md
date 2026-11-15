@@ -2,7 +2,7 @@
 
 Each date below has its own one-off scheduled task ("Creditt greeting: <occasion>") that posts at 7:13am Sydney time to LinkedIn (Creditt page), Facebook (Finance with Sid Singhal), Google Business Profile (Creditt.) and Instagram. Australia Day is deliberately excluded.
 
-A yearly planning task ("Creditt greetings: plan next year's calendar", 1 November) checks the next year's dates and schedules the next round.
+The old daily "holiday and festival posts" task is paused. Dates after 11 Nov 2027 are not scheduled yet: ask Claude around October 2027 to schedule the next year.
 
 ## Nov 2026 – Nov 2027
 
