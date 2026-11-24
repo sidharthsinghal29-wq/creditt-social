@@ -1,0 +1,95 @@
+# Uploads changed website files from site/ to GoDaddy (public_html) over FTPS.
+# Upload-only: it never deletes anything on the server, and never uploads .php files,
+# so the PHP form handlers that live only on the server are left untouched.
+#
+# Secrets (repo Settings > Secrets and variables > Actions):
+#   FTP_SERVER      e.g. ftp.creditt.com.au
+#   FTP_USERNAME    the cPanel FTP account limited to public_html
+#   FTP_PASSWORD
+#   FTP_REMOTE_DIR  optional. Leave unset if the FTP account's home folder IS public_html.
+#                   Set to "public_html" if the account opens one level above it.
+name: Deploy site
+
+on:
+  push:
+    branches: [main]
+    paths: ['site/**']
+  workflow_dispatch:
+    inputs:
+      files:
+        description: 'Space-separated file paths inside site/ to upload (e.g. "guarantor-home-loans.html blog.html sitemap.xml"). Leave empty to upload files changed in the latest commit.'
+        required: false
+        default: ''
+
+concurrency:
+  group: deploy-site
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Work out which files to upload
+        id: files
+        env:
+          INPUT_FILES: ${{ github.event.inputs.files }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          if [ -n "${INPUT_FILES:-}" ]; then
+            printf '%s\n' $INPUT_FILES | sed 's#^site/##' > /tmp/files.txt
+          else
+            if [ -n "${BEFORE:-}" ] && [ "$BEFORE" != "0000000000000000000000000000000000000000" ] && git cat-file -e "$BEFORE" 2>/dev/null; then
+              RANGE="$BEFORE..$GITHUB_SHA"
+            else
+              RANGE="$GITHUB_SHA~1..$GITHUB_SHA"
+            fi
+            git diff --name-only --diff-filter=ACMR "$RANGE" -- site/ | sed 's#^site/##' > /tmp/files.txt
+          fi
+          # Never upload PHP or repo-only notes; only upload files that exist.
+          grep -v -E '\.php$|^SITE-NOTES\.md$' /tmp/files.txt | while read -r f; do
+            [ -f "site/$f" ] && echo "$f"
+          done > /tmp/upload.txt || true
+          echo "Files to upload:"; cat /tmp/upload.txt
+          echo "count=$(wc -l < /tmp/upload.txt | tr -d ' ')" >> "$GITHUB_OUTPUT"
+
+      - name: Upload over FTPS (no deletes)
+        if: steps.files.outputs.count != '0'
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
+        run: |
+          set -euo pipefail
+          if [ -z "${FTP_SERVER:-}" ] || [ -z "${FTP_USERNAME:-}" ] || [ -z "${FTP_PASSWORD:-}" ]; then
+            echo "::error::FTP secrets are not set yet (FTP_SERVER, FTP_USERNAME, FTP_PASSWORD)."; exit 1
+          fi
+          sudo apt-get install -y -qq lftp >/dev/null
+          REMOTE="${FTP_REMOTE_DIR:-.}"
+          {
+            echo "set ftp:ssl-allow true"
+            echo "set ftp:ssl-force true"
+            echo "set ssl:verify-certificate false"
+            echo "set net:max-retries 3"
+            echo "set net:timeout 30"
+            echo "open -u \"$FTP_USERNAME\",\"$FTP_PASSWORD\" \"$FTP_SERVER\""
+            echo "cd \"$REMOTE\""
+            while read -r f; do
+              d=$(dirname "$f")
+              if [ "$d" != "." ]; then echo "mkdir -p -f \"$d\""; fi
+              echo "put \"site/$f\" -o \"$f\""
+            done < /tmp/upload.txt
+            echo "bye"
+          } > /tmp/lftp.script
+          lftp -f /tmp/lftp.script
+          echo "Uploaded $(wc -l < /tmp/upload.txt) file(s)."
+
+      - name: Summary
+        if: always()
+        run: |
+          { echo "### Deploy site"; echo; echo "Files:"; sed 's/^/- /' /tmp/upload.txt 2>/dev/null || true; } >> "$GITHUB_STEP_SUMMARY"
